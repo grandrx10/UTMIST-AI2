@@ -29,7 +29,7 @@ from sb3_contrib import RecurrentPPO # Importing an LSTM
 # from user.my_agent_tt import TTMLPPolicy
 
 
-class SubmittedAgent(Agent):
+class PredictiveAgent(Agent):
     '''
     Input the **file_path** to your agent here for submission!
     '''
@@ -130,8 +130,8 @@ class SubmittedAgent(Agent):
 
         self.weapons_range = {
             0: 0,
-            1: 0, # 0.6
-            2: 0 # 0.3
+            1: 0.6, # 0.6
+            2: 0.3 # 0.3
         }
 
     def predict(self, obs):
@@ -419,7 +419,7 @@ class SubmittedAgent(Agent):
                 if readible_obs["jumps_left"] == 0 and not readible_obs["grounded"]:
                     keys.append('w')
                     keys.append('k')
-            elif random.randint(0, 100) > 98:
+            elif random.randint(0, 100) > 96:
                 self.lastJumped = self.time
                 keys.append('space')
         
