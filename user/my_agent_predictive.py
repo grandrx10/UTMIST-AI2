@@ -29,7 +29,7 @@ from sb3_contrib import RecurrentPPO # Importing an LSTM
 # from user.my_agent_tt import TTMLPPolicy
 
 
-class PredictiveAgent(Agent):
+class SubmittedAgent(Agent):
     '''
     Input the **file_path** to your agent here for submission!
     '''
