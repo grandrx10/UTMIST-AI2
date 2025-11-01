@@ -115,9 +115,10 @@ class SubmittedAgent(Agent):
             ],
             # SPEAR
             1: [
-                {"keys": ["j"], "cover": [5], "type": "ground", "range": "far"},          # short swing, quick poke
+                {"keys": ["j"], "cover": [5], "type": "ground", "range": "lunge"},          # short swing, quick poke
                 {"keys": ["k"], "cover": [1, 2, 3], "type": "ground", "range": "lunge"},    # big lunge, heavy hit
-                {"keys": ["d", "j"], "cover": [5, 3], "type": "ground", "range": "far"},     # step-in swipe (right)
+                {"keys": ["d", "j"], "cover": [5, 3], "type": "ground", "range": "close"},
+                {"keys": ["d", "j"], "cover": [5, 3], "type": "ground", "range": "far"},      # step-in swipe (right)
                 {"keys": ["s", "j"], "cover": [8], "type": "ground", "range": "lunge"},     # low sweep
                 {"keys": ["s", "k"], "cover": [3, 5], "type": "ground", "range": "close", "super_safe": True},     # downward spike
                 {"keys": ["j"], "cover": [1, 2, 3, 4, 5, 6, 7, 8], "type": "aerial", "range": "close"},          # quick mid-air swing
