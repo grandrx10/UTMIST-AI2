@@ -428,7 +428,7 @@ class SubmittedAgent(Agent):
                 if readible_obs["jumps_left"] == 0 and readible_obs["aerial"]:
                     keys.append('w')
                     keys.append('k')
-            elif random.randint(0, 100) > 95:
+            elif random.randint(0, 100) > 97:
                 self.lastJumped = self.time
                 keys.append('space')
         
