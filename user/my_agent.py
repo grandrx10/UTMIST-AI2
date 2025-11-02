@@ -131,8 +131,8 @@ class SubmittedAgent(Agent):
 
         self.weapons_range = {
             0: 0,
-            1: 0.6, # 0.6
-            2: 0.6 # 0.3
+            1: 0.3, # 0.6
+            2: 0.3 # 0.3
         }
 
     def predict(self, obs):
@@ -230,7 +230,7 @@ class SubmittedAgent(Agent):
                 self.can_cross = False
         elif readible_obs["weapon_type"] != 0:
             self.phase = "aggressive"
-
+                    
         if nearest_spawner is None and readible_obs["weapon_type"] == 0 and readible_obs["opp_weapon_type"] != 0:
             self.phase = "flee"
             self.can_cross = True
