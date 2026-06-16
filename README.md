@@ -4,7 +4,7 @@
 
 [▶️ Match Demo (YouTube)](https://www.youtube.com/watch?v=mZT_RHlAO7U) · [📓 Colab Notebook](https://colab.research.google.com/drive/1V184vtHSagN13L0SbWGmnY-jCDvIefmm?usp=sharing) · [📄 Paper](https://drive.google.com/file/d/1G0hatGPBXvh2j5byjfrqKBthknNOt5sp/view) · [🏟️ Tournament Repo](https://utmist.gitlab.io/)
 
-> A hand-crafted, frame-by-frame decision agent for the [UTMIST](https://utmist.gitlab.io/) **AI² (AI Squared) 2025** 1v1 platform-fighting tournament — and it placed **3rd out of 400+ participants** in an event built around reinforcement learning, using no learning at all.
+> A hand-crafted, rules-based agent for the [UTMIST](https://utmist.gitlab.io/) **AI² (AI Squared) 2025** 1v1 platform-fighting tournament — and it placed **3rd out of 400+ participants** in an event built around reinforcement learning, using no learning at all.
 
 ---
 
@@ -12,74 +12,107 @@
 
 **3rd Place — UTMIST AI² 2025 Tournament** (400+ participants)
 
-The twist worth noting: AI² is a *reinforcement learning* tournament, where most submissions trained RL agents with the provided SB3 framework. AI Cubed took the opposite bet — a fully deterministic, rules-based agent driven by empirical move data — and beat the large majority of trained models to reach the podium.
+The twist worth noting: AI² is a *reinforcement learning* tournament, where most submissions trained RL agents with the provided Stable-Baselines3 framework. AI Cubed took the opposite bet — a fully deterministic, if-statement agent driven by a hand-authored move database — and beat the large majority of trained models to reach the podium.
 
 ---
 
 ## Overview
 
-**AI Cubed** is a competitive agent for the AI² environment: a Brawlhalla-inspired 1v1 platform fighter built in Pygame + PyMunk, with a custom multi-agent RL framework on top of Stable-Baselines3. Agents fight to knock each other off-stage while managing health, weapons, positioning, and recovery.
+**AI Cubed** is a competitive agent for the AI² environment: a Brawlhalla-inspired 1v1 platform fighter built in Pygame + PyMunk, with a custom multi-agent framework on top of Stable-Baselines3. Agents fight to knock each other off-stage while managing health, weapons, positioning, and recovery.
 
-Instead of training a policy, AI Cubed plays as a **greedy, per-frame state machine**: every single frame it evaluates the current game state and the set of available actions, then commits to the move with the best immediate payoff under a fixed priority hierarchy.
+Instead of training a policy, AI Cubed is a **reactive, per-frame controller**: a small phase-based state machine decides *what to do* (survive / arm up / fight), and a weapon-aware move database decides *which attack to throw* given the opponent's exact position. It implements `SubmittedAgent(Agent)`, and the tournament server calls its `predict(obs)` once per frame.
 
 ---
 
 ## How It Works
 
-### 1. Move characterization (the data step)
+### 1. The move database (the data step)
 
-Before writing any logic, I profiled every move available in the environment — measuring how each one actually behaves in practice (startup, active frames, damage, range, recovery/end-lag, and the situations where it wins). This empirical profile is what the agent's decisions are built on: rather than guessing which attack is "good," it picks the move whose measured properties best fit the current frame.
+The core of the agent is a hand-built table characterizing every move of every weapon. For each of the three weapons — **Fist (0)**, **Spear (1)**, and **Hammer (2)** — I catalogued each attack by:
 
-> 📝 **TODO — drop in your real numbers.** This table is the centerpiece of the "I gathered data" story, so fill it with the actual values you measured. Even rough buckets (fast / medium / slow) are compelling.
+- **`keys`** — the input(s) that trigger it (e.g. `["s", "k"]`)
+- **`type`** — whether it's a `ground` or `aerial` move
+- **`range`** — its effective reach bucket: `close`, `far`, or `lunge`
+- **`cover`** — the set of directional **sectors** the move actually hits (see below)
+- **`super_safe`** — a flag for risky moves (e.g. the Spear's downward spike) that should only be thrown when firmly on-stage
 
-| Move | Startup | Damage | Range | Recovery | Best Used When |
-|------|:-------:|:------:|:-----:|:--------:|----------------|
-| _e.g. Light attack_ | _fast_ | _low_ | _short_ | _short_ | _enemy adjacent, safe poke_ |
-| _e.g. Heavy attack_ | _slow_ | _high_ | _medium_ | _long_ | _enemy committed / stunned_ |
-| _Dodge / spot dodge_ | — | — | — | _short_ | _enemy close and attacking_ |
-| _Weapon attack_ | _…_ | _…_ | _…_ | _…_ | _… _ |
-| _…_ | | | | | |
+Each weapon also carries a small **reach bonus** (`weapons_range`): Fist `0`, Spear `+0.3`, Hammer `+0.3`. This database is what lets the agent answer "given where the opponent is *right now*, which of my moves can reach them?" instead of guessing.
 
-### 2. Greedy per-frame decision making
+| Weapon | Reach bonus | Profile |
+|--------|:-----------:|---------|
+| **Fist (0)** | `0` | Default unarmed kit; broad mix of close / far / lunge options on both ground and air |
+| **Spear (1)** | `+0.3` | Longest poke range; wide aerial coverage; includes a `super_safe` downward spike |
+| **Hammer (2)** | `+0.3` | Heavy, high-commitment swings and big lunges |
 
-Each frame is treated independently. The agent reads the state (its own position/health, the enemy's position/health and action, weapon availability, stage boundaries) and selects the single best move for *that* frame — no planning ahead, no learned value function, just the locally optimal choice given the priority order below.
+### 2. The 8-sector targeting system
 
-### 3. Priority hierarchy
+Each frame, the agent classifies the opponent's position into one of **8 directional sectors** relative to itself (above, below, left, right, and the four diagonals; `0` if overlapping), using a small dead-zone (`leeway = 0.3`) so near-aligned positions snap cleanly. Because the move table is authored for one facing direction, the sector is **mirrored horizontally when facing left** — so the same data works both ways.
 
-The agent resolves what to do in a strict order of importance:
+### 3. Move selection — filter, then randomize
 
-1. **Survive first** — self-preservation overrides everything. Recover to the stage when off-ledge, avoid getting hit, and don't take risks that could lead to a knockout.
-2. **Control weapons second** — once safe, prioritize acquiring and using weapons for the advantage they provide.
-3. **Engage the enemy last** — only after survival and weapon priorities are satisfied does it close distance and attack.
+When in range and ready to attack, the agent:
 
-### 4. Reactive spot dodging
+1. Buckets the distance to the opponent into `close` / `far` / `lunge` / `out_of_range` (including the weapon's reach bonus).
+2. Filters the current weapon's move list down to moves that match the **attack state** (ground vs aerial), the **range bucket**, the opponent's **sector**, and the `super_safe` constraint.
+3. Picks **randomly** among all moves that pass the filter.
 
-Layered on top: if the enemy is **close** *and* **currently attacking**, the agent performs a **spot dodge** to slip the incoming hit and create a punish window — a reactive override that protects the survival priority above.
+The randomness is intentional: among moves that are *all* valid for the situation, choosing unpredictably makes the agent much harder for an opponent to read and counter.
+
+### 4. Opponent prediction (leading the target)
+
+Before computing distance and sector, the agent extrapolates the opponent's position one frame ahead using their velocity (`opp_pos += opp_vel * 1/30`), so attacks are aimed at where the opponent is *going*, not where they were.
+
+### 5. Phase-based state machine
+
+A lightweight phase variable governs high-level intent:
+
+- **`aggressive`** *(default)* — chase the opponent and attack when in range. Taking damage snaps the agent back into this phase.
+- **`weapon_grab`** — when unarmed, route to the nearest active weapon spawner and pick it up (`h`) once within `0.5` units.
+- **`flee`** — when unarmed *and* the opponent is armed *and* no spawner is reachable, retreat to a different platform rather than fight at a disadvantage.
+
+The effective priority, in order: **stay alive → get a weapon → engage the enemy.**
+
+### 6. Survival: recovery & spot dodge
+
+- **Off-stage recovery** — when not safely on a platform, the agent finds the nearest platform (vertical distance weighted ×1.8 so it favors reachable ledges), moves toward its edge, jumps on a cooldown, and — if it's out of jumps in the air — fires the dedicated recovery move (`w` + `k`).
+- **Reactive spot dodge** — if the opponent is within `1` unit **and** in `AttackState` (and a 50-frame cooldown has elapsed), the agent drops all other inputs and dodges (`l`) to slip the hit.
 
 ### Decision flow
 
 ```text
 every frame:
-    if enemy is close AND enemy is attacking:
-        → spot dodge                       # reactive defense
-    elif self is in danger:                # off-stage, about to be hit, low margin
-        → prioritize survival              # recover / retreat / defend
-    elif a weapon is available:
-        → secure or use the weapon         # positional advantage
+    predict opponent position one frame ahead (lead the target)
+
+    if opponent within 1 unit AND opponent is attacking (cooldown ok):
+        → spot dodge                       # reactive defense, overrides all
+
+    set phase:
+        unarmed + spawner reachable        → weapon_grab
+        unarmed + opponent armed + no spawner → flee
+        otherwise / armed / took damage    → aggressive
+
+    if not safely on a platform:
+        → recover to nearest platform (jump / recovery move)
+
+    elif phase == aggressive and in range:
+        bucket distance → close / far / lunge
+        filter weapon moves by (ground|aerial, range, opponent sector, super_safe)
+        → pick a valid move at random
+
     else:
-        → close distance and choose the    # greedy: best move by measured data
-          optimal attack for this frame
+        → move toward target (opponent, spawner, or flee platform)
 ```
 
 ---
 
-## Why a state machine instead of RL?
+## Why a rules-based agent instead of RL?
 
-In a tournament explicitly designed around reinforcement learning, a deterministic agent is a deliberate, contrarian design choice — and the 3rd-place finish is the argument for it:
+In a tournament explicitly designed around reinforcement learning, a deterministic agent is a deliberate, contrarian choice — and the 3rd-place finish is the argument for it:
 
-- **Predictable and debuggable** — every decision traces back to an explicit rule, so failures are diagnosable instead of opaque.
-- **No training instability or reward-shaping headaches** — the agent's quality is bounded by the move data and the priority logic, both of which I controlled directly.
-- **Survival-first beats aggression** — many trained agents over-commit to attacking; prioritizing not-dying turns out to be a strong baseline in a knockout-based game.
+- **Predictable and debuggable** — every decision traces to an explicit rule, so failures are diagnosable instead of opaque.
+- **No training instability or reward-shaping headaches** — the agent's quality is bounded by the move database and the phase logic, both of which I controlled directly.
+- **Survival-first beats raw aggression** — recovery, fleeing when out-gunned, and reactive dodging make the agent hard to knock out, which wins a game decided by knockouts.
+- **Domain knowledge as data** — encoding *how each move behaves* into a structured table turned out to be a faster path to strong play than learning it from scratch.
 
 ---
 
@@ -96,44 +129,44 @@ In a tournament explicitly designed around reinforcement learning, a determinist
 
 ## Running the Agent
 
-> 📝 **TODO — fill in your actual setup/run steps.** Example scaffold below.
+The agent is submitted as the `SubmittedAgent(Agent)` class. The tournament server instantiates it and calls `predict(obs)` each frame. To run it locally against the provided baselines (`SB3Agent`, `BasedAgent`):
+
+> 📝 **TODO — confirm/adjust to match the official harness's actual entry point.**
 
 ```bash
-# 1. Clone and install
-git clone <your-repo-url>
-cd <your-repo>
+# 1. Set up the AI² environment (see the tournament repo)
 pip install -r requirements.txt
 
-# 2. Run AI Cubed against a baseline / another agent
-python run_match.py --agent ai_cubed --opponent <opponent>
+# 2. Drop SubmittedAgent into the submission cell / file and run a match
+#    against one of the provided baseline agents.
 ```
 
-The agent entry point lives in `<path/to/agent_file.py>` and exposes the action-selection function the tournament server calls each frame.
+This agent is purely rules-based, so it needs **no model download** — the `_gdown` / `learn` / `save` hooks are inherited scaffolding from the RL template and aren't used at inference time.
 
 ---
 
 ## Tech Stack
 
-- **Python** — agent logic
+- **Python** — all agent logic
+- **NumPy** — observation handling
 - **Pygame + PyMunk** — game environment and physics (provided by AI²)
-- **Stable-Baselines3** — the tournament's multi-agent RL framework (used by the environment; AI Cubed itself is rules-based)
+- **Stable-Baselines3 / sb3-contrib** — the tournament's RL framework (imported by the template; AI Cubed itself uses none of it at runtime)
 
 ---
 
 ## Limitations & Future Work
 
-> 📝 Optional, but this section reads well — it shows you understand the tradeoffs you made.
-
-- **No long-horizon planning.** Greedy per-frame choices can be baited by opponents who set traps a few frames ahead.
-- **Hand-tuned priorities.** Thresholds (what counts as "close," "in danger") are manually set; a small search or learned tuning could sharpen them.
-- **Static to opponent behavior.** The agent doesn't adapt mid-match to a specific opponent's tendencies.
-- **Possible next step:** use the same move-characterization data to seed or shape an RL policy — combining the reliability of the rules with learned long-term play.
+- **One-frame lookahead only.** Beyond leading the opponent by a single frame, there's no multi-step planning, so the agent can be baited by setups a few frames ahead.
+- **Hand-tuned thresholds.** Distance buckets, dead-zones, and cooldowns are set manually; a small search could sharpen them.
+- **Random move choice is unweighted.** Among valid moves it picks uniformly; weighting by damage / safety / KO potential would likely raise its ceiling.
+- **No opponent modeling.** It reacts to the current frame but doesn't adapt to a specific opponent's tendencies over a match.
+- **Possible next step:** use the same move database to *shape or seed* an RL policy — combining the reliability of the rules with learned long-term play.
 
 ---
 
 ## Team
 
-**Team AI Cubed (AI³)** — a step up from AI Squared. 😄
+**Team AI Cubed (AI³)** — one better than AI Squared. 😄
 
 > 📝 **TODO — add team members** (names / GitHub / roles).
 
