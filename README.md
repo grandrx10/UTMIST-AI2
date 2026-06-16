@@ -1,10 +1,10 @@
 # AI Cubed (AI³) — UTMIST AI² 2025 Tournament Agent 🥉
 
-[![Watch the Demo](https://img.youtube.com/vi/mZT_RHlAO7U/hqdefault.jpg)](https://www.youtube.com/watch?v=mZT_RHlAO7U)
+[![Watch the Demo](https://img.youtube.com/vi/mZT_RHlAO7U/hqdefault.jpg)](https://www.youtube.com/live/mZT_RHlAO7U?si=60Fv3cxYmgwf--8i&t=10762)
 
 [▶️ Match Demo (YouTube)](https://www.youtube.com/watch?v=mZT_RHlAO7U) · [📓 Colab Notebook](https://colab.research.google.com/drive/1V184vtHSagN13L0SbWGmnY-jCDvIefmm?usp=sharing) · [📄 Paper](https://drive.google.com/file/d/1G0hatGPBXvh2j5byjfrqKBthknNOt5sp/view) · [🏟️ Tournament Repo](https://utmist.gitlab.io/)
 
-> A hand-crafted, rules-based agent for the [UTMIST](https://utmist.gitlab.io/) **AI² (AI Squared) 2025** 1v1 platform-fighting tournament — and it placed **3rd out of 400+ participants** in an event built around reinforcement learning, using no learning at all.
+> A hand-crafted, rules-based agent for the [UTMIST](https://utmist.gitlab.io/) **AI² (AI Squared) 2025** 1v1 platform-fighting tournament — and it placed **3rd out of 400+ participants** in an event built around reinforcement learning, using no learning at all. You can view the sample fights at 3:06:12, 2:59:22.
 
 ---
 
@@ -107,12 +107,11 @@ every frame:
 
 ## Why a rules-based agent instead of RL?
 
-In a tournament explicitly designed around reinforcement learning, a deterministic agent is a deliberate, contrarian choice — and the 3rd-place finish is the argument for it:
+Although this tournament heavily encourages the use of RL, I decided to join specifically to create an agent that used the traditional state-machine style decision making for the following reasons:
 
-- **Predictable and debuggable** — every decision traces to an explicit rule, so failures are diagnosable instead of opaque.
-- **No training instability or reward-shaping headaches** — the agent's quality is bounded by the move database and the phase logic, both of which I controlled directly.
-- **Survival-first beats raw aggression** — recovery, fleeing when out-gunned, and reactive dodging make the agent hard to knock out, which wins a game decided by knockouts.
-- **Domain knowledge as data** — encoding *how each move behaves* into a structured table turned out to be a faster path to strong play than learning it from scratch.
+- **Predictable** — RL machines are black boxes, and so you can quickly become unsure of how to properly improve your model. This makes it more of an 'art' and less of a 'science'. Given the week time frame that was given to develop this agent, I felt that RL would not produce good enough results to justify its use here.
+- **Easy to improve** — When taking a look at the state machine AI, you can clearly know what it is thinking every frame by going through the checkboxes. Thus, if after a fight, I realized it could have done something better, then that could easily be programmed into it manually. Whereas, if you had it learn on its own, if given the wrong rewards, it could easily develop habits that would lead it nowhere.
+- **Use as base** — Originally, the intention was to use this state based agent as a trainer or "base" for the actual RL model, but given the short of amount of time given for the hackathon, this was not reasonable. Instead, all effort was put into improving upon the model.
 
 ---
 
