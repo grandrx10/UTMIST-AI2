@@ -166,7 +166,3 @@ This agent is purely rules-based, so it needs **no model download** — the `_gd
 Built for the **[UTMIST](https://utmist.gitlab.io/) AI² 2025 Tournament**. Thanks to the UTMIST team for the environment, framework, and event.
 
 ---
-
-## License
-
-> 📝 **TODO — add a license** (e.g. MIT) if you want this to be reusable.
