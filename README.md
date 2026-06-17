@@ -130,8 +130,6 @@ Although this tournament heavily encourages the use of RL, I decided to join spe
 
 The agent is submitted as the `SubmittedAgent(Agent)` class. The tournament server instantiates it and calls `predict(obs)` each frame. To run it locally against the provided baselines (`SB3Agent`, `BasedAgent`):
 
-> 📝 **TODO — confirm/adjust to match the official harness's actual entry point.**
-
 ```bash
 # 1. Set up the AI² environment (see the tournament repo)
 pip install -r requirements.txt
@@ -160,14 +158,6 @@ This agent is purely rules-based, so it needs **no model download** — the `_gd
 - **Random move choice is unweighted.** Among valid moves it picks uniformly; weighting by damage / safety / KO potential would likely raise its ceiling.
 - **No opponent modeling.** It reacts to the current frame but doesn't adapt to a specific opponent's tendencies over a match.
 - **Possible next step:** use the same move database to *shape or seed* an RL policy — combining the reliability of the rules with learned long-term play.
-
----
-
-## Team
-
-**Team AI Cubed (AI³)** — one better than AI Squared. 😄
-
-> 📝 **TODO — add team members** (names / GitHub / roles).
 
 ---
 
